@@ -34,6 +34,23 @@ import (
 
 var _ bridgev2.ConfigValidatingNetwork = (*TelegramConnector)(nil)
 
+type RoomNameSync string
+
+const (
+	RoomNameSyncBoth              RoomNameSync = "both"
+	RoomNameSyncNone              RoomNameSync = "none"
+	RoomNameSyncMatrixToTelegram  RoomNameSync = "matrix_to_telegram"
+	RoomNameSyncTelegramToMatrix  RoomNameSync = "telegram_to_matrix"
+)
+
+func (s RoomNameSync) ToTelegram() bool {
+	return s == RoomNameSyncBoth || s == RoomNameSyncMatrixToTelegram
+}
+
+func (s RoomNameSync) FromTelegram() bool {
+	return s == RoomNameSyncBoth || s == RoomNameSyncTelegramToMatrix
+}
+
 type MemberListConfig struct {
 	MaxInitialSync        int  `yaml:"max_initial_sync"`
 	SyncBroadcastChannels bool `yaml:"sync_broadcast_channels"`
@@ -90,6 +107,7 @@ type TelegramConfig struct {
 		BackwardBackfill bool `yaml:"backward_backfill"`
 	} `yaml:"takeout"`
 
+	RoomNameSync                         RoomNameSync        `yaml:"room_name_sync"`
 	ContactAvatars                       bool                `yaml:"contact_avatars"`
 	ContactNames                         bool                `yaml:"contact_names"`
 	MaxMemberCount                       int                 `yaml:"max_member_count"`
@@ -142,6 +160,9 @@ func (c *TelegramConfig) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (c *TelegramConfig) PostProcess() error {
+	if c.RoomNameSync == "" {
+		c.RoomNameSync = RoomNameSyncBoth
+	}
 	var err error
 	c.displaynameTemplate, err = template.New("displayname").Parse(c.DisplaynameTemplate)
 	return err
@@ -181,6 +202,7 @@ func upgradeConfig(helper up.Helper) {
 	helper.Copy(up.Bool, "takeout", "dialog_sync")
 	helper.Copy(up.Bool, "takeout", "forward_backfill")
 	helper.Copy(up.Bool, "takeout", "backward_backfill")
+	helper.Copy(up.Str, "room_name_sync")
 	helper.Copy(up.Bool, "contact_avatars")
 	helper.Copy(up.Bool, "contact_names")
 	helper.Copy(up.Int, "max_member_count")
@@ -215,6 +237,9 @@ func (tc *TelegramConnector) ValidateConfig() error {
 	}
 	if tc.Config.APIHash == "" || tc.Config.APIHash == "tjyd5yge35lbodk1xwzw2jstp90k55qz" {
 		return fmt.Errorf("api_hash is required")
+	}
+	if !slices.Contains([]RoomNameSync{RoomNameSyncBoth, RoomNameSyncNone, RoomNameSyncMatrixToTelegram, RoomNameSyncTelegramToMatrix}, tc.Config.RoomNameSync) {
+		return fmt.Errorf("unsupported room_name_sync value: %s", tc.Config.RoomNameSync)
 	}
 	if !slices.Contains([]string{"disable", "gif", "png", "webp", "webm"}, tc.Config.AnimatedSticker.Target) {
 		return fmt.Errorf("unsupported animated sticker target: %s", tc.Config.AnimatedSticker.Target)

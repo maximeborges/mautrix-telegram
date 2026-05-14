@@ -179,6 +179,8 @@ func (tc *TelegramClient) onUpdateChannel(ctx context.Context, e tg.Entities, up
 				if err != nil {
 					return nil, err
 				}
+			} else if !tc.main.Config.RoomNameSync.FromTelegram() {
+				chatInfo.Name = nil
 			}
 			return chatInfo, nil
 		},
@@ -304,6 +306,9 @@ func (tc *TelegramClient) handleServiceMessage(ctx context.Context, msg *tg.Mess
 	}
 	switch action := msg.Action.(type) {
 	case *tg.MessageActionChatEditTitle:
+		if !tc.main.Config.RoomNameSync.FromTelegram() {
+			return nil
+		}
 		res := tc.main.Bridge.QueueRemoteEvent(tc.userLogin, &simplevent.ChatInfoChange{
 			EventMeta:      eventMeta.WithType(bridgev2.RemoteEventChatInfoChange),
 			ChatInfoChange: &bridgev2.ChatInfoChange{ChatInfo: &bridgev2.ChatInfo{Name: &action.Title}},

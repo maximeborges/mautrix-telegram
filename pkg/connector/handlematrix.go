@@ -1226,6 +1226,9 @@ func (tc *TelegramClient) HandleMatrixDeleteChat(ctx context.Context, chat *brid
 }
 
 func (tc *TelegramClient) HandleMatrixRoomName(ctx context.Context, msg *bridgev2.MatrixRoomName) (bool, error) {
+	if !tc.main.Config.RoomNameSync.ToTelegram() {
+		return false, nil
+	}
 	peerType, id, topicID, err := ids.ParsePortalID(msg.Portal.ID)
 	if err != nil {
 		return false, err
